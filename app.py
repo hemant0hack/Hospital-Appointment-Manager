@@ -1,14 +1,15 @@
+# app.py
 import streamlit as st
 from datetime import datetime
 import pandas as pd
+from database import HospitalDatabase
 
-# Initialize session state for data persistence
-if 'patients' not in st.session_state:
-    st.session_state.patients = []
-if 'doctors' not in st.session_state:
-    st.session_state.doctors = []
-if 'appointments' not in st.session_state:
-    st.session_state.appointments = []
+# Initialize database
+@st.cache_resource
+def get_database():
+    return HospitalDatabase()
+
+db = get_database()
 
 def get_current_datetime():
     return datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -35,9 +36,14 @@ def main():
     ]
     choice = st.sidebar.selectbox("Select Module", menu_options)
     
+    # Load data from database
+    patients = db.get_all_patients()
+    doctors = db.get_all_doctors()
+    appointments = db.get_all_appointments()
+    
     # Dashboard
     if choice == "Dashboard":
-        show_dashboard()
+        show_dashboard(patients, doctors, appointments)
     
     # Patients Management
     elif choice == "Patients Management":
@@ -49,23 +55,23 @@ def main():
     
     # Appointments Management
     elif choice == "Appointments Management":
-        appointments_management()
+        appointments_management(patients, doctors)
     
     # Reset Data
     elif choice == "Reset All Data":
         reset_data()
 
-def show_dashboard():
+def show_dashboard(patients, doctors, appointments):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Total Patients", len(st.session_state.patients))
+        st.metric("Total Patients", len(patients))
     
     with col2:
-        st.metric("Total Doctors", len(st.session_state.doctors))
+        st.metric("Total Doctors", len(doctors))
     
     with col3:
-        st.metric("Total Appointments", len(st.session_state.appointments))
+        st.metric("Total Appointments", len(appointments))
     
     st.markdown("---")
     
@@ -74,8 +80,8 @@ def show_dashboard():
     
     with col1:
         st.subheader("Recent Patients")
-        if st.session_state.patients:
-            recent_patients = st.session_state.patients[-5:] if len(st.session_state.patients) > 5 else st.session_state.patients
+        if patients:
+            recent_patients = patients[-5:] if len(patients) > 5 else patients
             for patient in reversed(recent_patients):
                 st.write(f"**{patient['name']}** (ID: {patient['id']}) - {patient['disease']}")
         else:
@@ -83,8 +89,8 @@ def show_dashboard():
     
     with col2:
         st.subheader("Recent Appointments")
-        if st.session_state.appointments:
-            recent_appointments = st.session_state.appointments[-5:] if len(st.session_state.appointments) > 5 else st.session_state.appointments
+        if appointments:
+            recent_appointments = appointments[-5:] if len(appointments) > 5 else appointments
             for appointment in reversed(recent_appointments):
                 st.write(f"**{appointment['patientName']}** with **{appointment['doctorName']}**")
         else:
@@ -116,39 +122,45 @@ def patients_management():
             
             if st.form_submit_button("Add Patient"):
                 if pid and name and disease:
-                    patient_data = {
-                        "id": pid,
-                        "name": name,
-                        "age": age,
-                        "gender": gender,
-                        "address": address,
-                        "disease": disease,
-                        "REFERRED_BY": referred_by,
-                        "admissionDateTime": get_current_datetime(),
-                    }
-                    st.session_state.patients.append(patient_data)
-                    st.success("Patient added successfully!")
-                    st.rerun()
+                    # Check if patient ID already exists
+                    existing_patient = db.get_patient_by_id(pid)
+                    if existing_patient:
+                        st.error("Patient ID already exists! Please use a different ID.")
+                    else:
+                        patient_data = {
+                            "id": pid,
+                            "name": name,
+                            "age": age,
+                            "gender": gender,
+                            "address": address,
+                            "disease": disease,
+                            "REFERRED_BY": referred_by,
+                            "admissionDateTime": get_current_datetime(),
+                        }
+                        db.add_patient(patient_data)
+                        st.success("Patient added successfully!")
+                        st.rerun()
                 else:
                     st.error("Please fill in all required fields (*)")
     
     with tab2:
         st.subheader("All Patients")
-        if st.session_state.patients:
-            patients_df = pd.DataFrame(st.session_state.patients)
+        patients = db.get_all_patients()
+        if patients:
+            patients_df = pd.DataFrame(patients)
             st.dataframe(patients_df, use_container_width=True)
         else:
             st.info("No patients found")
     
     with tab3:
         st.subheader("Edit Patient")
-        if st.session_state.patients:
-            patient_ids = [p['id'] for p in st.session_state.patients]
+        patients = db.get_all_patients()
+        if patients:
+            patient_ids = [p['id'] for p in patients]
             selected_pid = st.selectbox("Select Patient ID to edit", patient_ids)
             
             if selected_pid:
-                patient_idx = next(i for i, p in enumerate(st.session_state.patients) if p['id'] == selected_pid)
-                patient = st.session_state.patients[patient_idx]
+                patient = db.get_patient_by_id(selected_pid)
                 
                 with st.form("edit_patient_form"):
                     col1, col2 = st.columns(2)
@@ -165,7 +177,7 @@ def patients_management():
                         new_referred_by = st.text_input("Referred By", value=patient['REFERRED_BY'])
                     
                     if st.form_submit_button("Update Patient"):
-                        st.session_state.patients[patient_idx].update({
+                        updated_data = {
                             "name": new_name,
                             "age": new_age,
                             "gender": new_gender,
@@ -173,7 +185,8 @@ def patients_management():
                             "disease": new_disease,
                             "REFERRED_BY": new_referred_by,
                             "admissionDateTime": get_current_datetime(),
-                        })
+                        }
+                        db.update_patient(selected_pid, updated_data)
                         st.success("Patient updated successfully!")
                         st.rerun()
         else:
@@ -181,28 +194,30 @@ def patients_management():
     
     with tab4:
         st.subheader("View Patient by ID")
-        if st.session_state.patients:
-            patient_ids = [p['id'] for p in st.session_state.patients]
+        patients = db.get_all_patients()
+        if patients:
+            patient_ids = [p['id'] for p in patients]
             selected_pid = st.selectbox("Select Patient ID", patient_ids)
             
             if selected_pid:
-                patient = next(p for p in st.session_state.patients if p['id'] == selected_pid)
+                patient = db.get_patient_by_id(selected_pid)
                 st.json(patient)
         else:
             st.info("No patients available")
     
     with tab5:
         st.subheader("Delete Patient")
-        if st.session_state.patients:
-            patient_ids = [p['id'] for p in st.session_state.patients]
+        patients = db.get_all_patients()
+        if patients:
+            patient_ids = [p['id'] for p in patients]
             selected_pid = st.selectbox("Select Patient ID to delete", patient_ids, key="delete_patient")
             
             if selected_pid:
-                patient = next(p for p in st.session_state.patients if p['id'] == selected_pid)
+                patient = db.get_patient_by_id(selected_pid)
                 st.warning(f"Are you sure you want to delete patient: {patient['name']} (ID: {patient['id']})?")
                 
                 if st.button("Confirm Delete"):
-                    st.session_state.patients = [p for p in st.session_state.patients if p['id'] != selected_pid]
+                    db.delete_patient(selected_pid)
                     st.success("Patient deleted successfully!")
                     st.rerun()
         else:
@@ -231,35 +246,41 @@ def doctors_management():
             
             if st.form_submit_button("Add Doctor"):
                 if did and name and specialization:
-                    doctor_data = {
-                        "id": did,
-                        "name": name,
-                        "specialization": specialization,
-                        "experience": experience,
-                    }
-                    st.session_state.doctors.append(doctor_data)
-                    st.success("Doctor added successfully!")
-                    st.rerun()
+                    # Check if doctor ID already exists
+                    existing_doctor = db.get_doctor_by_id(did)
+                    if existing_doctor:
+                        st.error("Doctor ID already exists! Please use a different ID.")
+                    else:
+                        doctor_data = {
+                            "id": did,
+                            "name": name,
+                            "specialization": specialization,
+                            "experience": experience,
+                        }
+                        db.add_doctor(doctor_data)
+                        st.success("Doctor added successfully!")
+                        st.rerun()
                 else:
                     st.error("Please fill in all required fields (*)")
     
     with tab2:
         st.subheader("All Doctors")
-        if st.session_state.doctors:
-            doctors_df = pd.DataFrame(st.session_state.doctors)
+        doctors = db.get_all_doctors()
+        if doctors:
+            doctors_df = pd.DataFrame(doctors)
             st.dataframe(doctors_df, use_container_width=True)
         else:
             st.info("No doctors found")
     
     with tab3:
         st.subheader("Edit Doctor")
-        if st.session_state.doctors:
-            doctor_ids = [d['id'] for d in st.session_state.doctors]
+        doctors = db.get_all_doctors()
+        if doctors:
+            doctor_ids = [d['id'] for d in doctors]
             selected_did = st.selectbox("Select Doctor ID to edit", doctor_ids)
             
             if selected_did:
-                doctor_idx = next(i for i, d in enumerate(st.session_state.doctors) if d['id'] == selected_did)
-                doctor = st.session_state.doctors[doctor_idx]
+                doctor = db.get_doctor_by_id(selected_did)
                 
                 with st.form("edit_doctor_form"):
                     col1, col2 = st.columns(2)
@@ -272,11 +293,12 @@ def doctors_management():
                         new_experience = st.number_input("Experience (years)", value=doctor['experience'])
                     
                     if st.form_submit_button("Update Doctor"):
-                        st.session_state.doctors[doctor_idx].update({
+                        updated_data = {
                             "name": new_name,
                             "specialization": new_specialization,
                             "experience": new_experience,
-                        })
+                        }
+                        db.update_doctor(selected_did, updated_data)
                         st.success("Doctor updated successfully!")
                         st.rerun()
         else:
@@ -284,34 +306,36 @@ def doctors_management():
     
     with tab4:
         st.subheader("View Doctor by ID")
-        if st.session_state.doctors:
-            doctor_ids = [d['id'] for d in st.session_state.doctors]
+        doctors = db.get_all_doctors()
+        if doctors:
+            doctor_ids = [d['id'] for d in doctors]
             selected_did = st.selectbox("Select Doctor ID", doctor_ids, key="view_doctor")
             
             if selected_did:
-                doctor = next(d for d in st.session_state.doctors if d['id'] == selected_did)
+                doctor = db.get_doctor_by_id(selected_did)
                 st.json(doctor)
         else:
             st.info("No doctors available")
     
     with tab5:
         st.subheader("Delete Doctor")
-        if st.session_state.doctors:
-            doctor_ids = [d['id'] for d in st.session_state.doctors]
+        doctors = db.get_all_doctors()
+        if doctors:
+            doctor_ids = [d['id'] for d in doctors]
             selected_did = st.selectbox("Select Doctor ID to delete", doctor_ids, key="delete_doctor")
             
             if selected_did:
-                doctor = next(d for d in st.session_state.doctors if d['id'] == selected_did)
+                doctor = db.get_doctor_by_id(selected_did)
                 st.warning(f"Are you sure you want to delete doctor: {doctor['name']} (ID: {doctor['id']})?")
                 
                 if st.button("Confirm Delete"):
-                    st.session_state.doctors = [d for d in st.session_state.doctors if d['id'] != selected_did]
+                    db.delete_doctor(selected_did)
                     st.success("Doctor deleted successfully!")
                     st.rerun()
         else:
             st.info("No doctors available to delete")
 
-def appointments_management():
+def appointments_management(patients, doctors):
     st.header("📅 Appointments Management")
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -325,8 +349,8 @@ def appointments_management():
             aid = st.text_input("Appointment ID*")
             
             # Get available patients and doctors
-            patient_names = [p['name'] for p in st.session_state.patients]
-            doctor_names = [d['name'] for d in st.session_state.doctors]
+            patient_names = [p['name'] for p in patients]
+            doctor_names = [d['name'] for d in doctors]
             
             col1, col2 = st.columns(2)
             
@@ -346,40 +370,49 @@ def appointments_management():
             
             if st.form_submit_button("Add Appointment"):
                 if aid and patient_name and doctor_name:
-                    appointment_data = {
-                        "id": aid,
-                        "patientName": patient_name,
-                        "doctorName": doctor_name,
-                        "appointmentDateTime": get_current_datetime(),
-                    }
-                    st.session_state.appointments.append(appointment_data)
-                    st.success("Appointment added successfully!")
-                    st.rerun()
+                    # Check if appointment ID already exists
+                    existing_appointment = db.get_appointment_by_id(aid)
+                    if existing_appointment:
+                        st.error("Appointment ID already exists! Please use a different ID.")
+                    else:
+                        appointment_data = {
+                            "id": aid,
+                            "patientName": patient_name,
+                            "doctorName": doctor_name,
+                            "appointmentDateTime": get_current_datetime(),
+                        }
+                        db.add_appointment(appointment_data)
+                        st.success("Appointment added successfully!")
+                        st.rerun()
                 else:
                     st.error("Please fill in all required fields (*)")
     
     with tab2:
         st.subheader("All Appointments")
-        if st.session_state.appointments:
-            appointments_df = pd.DataFrame(st.session_state.appointments)
+        appointments = db.get_all_appointments()
+        if appointments:
+            appointments_df = pd.DataFrame(appointments)
             st.dataframe(appointments_df, use_container_width=True)
         else:
             st.info("No appointments found")
     
     with tab3:
         st.subheader("Edit Appointment")
-        if st.session_state.appointments:
-            appointment_ids = [a['id'] for a in st.session_state.appointments]
+        appointments = db.get_all_appointments()
+        patients = db.get_all_patients()
+        doctors = db.get_all_doctors()
+        
+        if appointments:
+            appointment_ids = [a['id'] for a in appointments]
             selected_aid = st.selectbox("Select Appointment ID to edit", appointment_ids)
             
             if selected_aid:
-                appointment_idx = next(i for i, a in enumerate(st.session_state.appointments) if a['id'] == selected_aid)
-                appointment = st.session_state.appointments[appointment_idx]
+                appointment = db.get_appointment_by_id(selected_aid)
                 
                 with st.form("edit_appointment_form"):
                     # Get available patients and doctors
-                    patient_names = [p['name'] for p in st.session_state.patients]
-                    doctor_names = [d['name'] for d in st.session_state.doctors]
+                    patient_names = [p['name'] for p in patients]
+                    doctor_names = [d['name'] for d in doctors]
                     
                     col1, col2 = st.columns(2)
                     
@@ -400,11 +433,12 @@ def appointments_management():
                             new_doctor_name = ""
                     
                     if st.form_submit_button("Update Appointment"):
-                        st.session_state.appointments[appointment_idx].update({
+                        updated_data = {
                             "patientName": new_patient_name,
                             "doctorName": new_doctor_name,
                             "appointmentDateTime": get_current_datetime(),
-                        })
+                        }
+                        db.update_appointment(selected_aid, updated_data)
                         st.success("Appointment updated successfully!")
                         st.rerun()
         else:
@@ -412,28 +446,30 @@ def appointments_management():
     
     with tab4:
         st.subheader("View Appointment by ID")
-        if st.session_state.appointments:
-            appointment_ids = [a['id'] for a in st.session_state.appointments]
+        appointments = db.get_all_appointments()
+        if appointments:
+            appointment_ids = [a['id'] for a in appointments]
             selected_aid = st.selectbox("Select Appointment ID", appointment_ids, key="view_appointment")
             
             if selected_aid:
-                appointment = next(a for a in st.session_state.appointments if a['id'] == selected_aid)
+                appointment = db.get_appointment_by_id(selected_aid)
                 st.json(appointment)
         else:
             st.info("No appointments available")
     
     with tab5:
         st.subheader("Delete Appointment")
-        if st.session_state.appointments:
-            appointment_ids = [a['id'] for a in st.session_state.appointments]
+        appointments = db.get_all_appointments()
+        if appointments:
+            appointment_ids = [a['id'] for a in appointments]
             selected_aid = st.selectbox("Select Appointment ID to delete", appointment_ids, key="delete_appointment")
             
             if selected_aid:
-                appointment = next(a for a in st.session_state.appointments if a['id'] == selected_aid)
+                appointment = db.get_appointment_by_id(selected_aid)
                 st.warning(f"Are you sure you want to delete appointment: {appointment['patientName']} with {appointment['doctorName']}?")
                 
                 if st.button("Confirm Delete"):
-                    st.session_state.appointments = [a for a in st.session_state.appointments if a['id'] != selected_aid]
+                    db.delete_appointment(selected_aid)
                     st.success("Appointment deleted successfully!")
                     st.rerun()
         else:
@@ -443,12 +479,10 @@ def reset_data():
     st.header("🔄 Reset All Data")
     
     st.warning("⚠️ This action cannot be undone!")
-    st.error("All patient, doctor, and appointment data will be permanently deleted.")
+    st.error("All patient, doctor, and appointment data will be permanently deleted from the database.")
     
     if st.button("Reset All Data", type="primary"):
-        st.session_state.patients = []
-        st.session_state.doctors = []
-        st.session_state.appointments = []
+        db.reset_all_data()
         st.success("All data has been reset successfully!")
         st.rerun()
 
