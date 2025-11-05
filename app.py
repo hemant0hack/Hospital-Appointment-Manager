@@ -5,21 +5,11 @@ import pandas as pd
 from database import HospitalDatabase
 
 # Initialize database
-@st.cache_resource(show_spinner=False)
+@st.cache_resource
 def get_database():
-    try:
-        db = HospitalDatabase()
-        # Test database connection
-        db.get_all_patients()  # This will create tables if they don't exist
-        return db
-    except Exception as e:
-        st.error(f"Database initialization error: {str(e)}")
-        return None
+    return HospitalDatabase()
 
 db = get_database()
-if db is None:
-    st.error("Failed to initialize the database. Please check the logs.")
-    st.stop()
 
 def get_current_datetime():
     return datetime.now().strftime("%d-%m-%Y %H:%M:%S")
