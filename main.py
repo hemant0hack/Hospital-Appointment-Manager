@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from datetime import datetime
 import sys
+from database import HospitalDatabase
 
-patients = []  # list of dicts
-doctors = []
-appointments = []
+# Use persistent database instead of in-memory lists
+db = HospitalDatabase()
 
 
 def get_current_datetime():
@@ -25,7 +25,7 @@ def add_patient():
     disease = input("Enter Patient Disease: ").strip()
     referred_by = input("Enter Referred By: ").strip()
     admission = get_current_datetime()
-    patients.append({
+    patient = {
         "id": pid,
         "name": name,
         "age": age,
@@ -34,11 +34,13 @@ def add_patient():
         "disease": disease,
         "REFERRED_BY": referred_by,
         "admissionDateTime": admission,
-    })
+    }
+    db.add_patient(patient)
     print("Patient added successfully!\n")
 
 
 def view_patients():
+    patients = db.get_all_patients()
     if not patients:
         print("No patients found.")
         return
@@ -46,20 +48,12 @@ def view_patients():
         print(f"ID: {p['id']} | Name: {p['name']} | Age: {p['age']} | Gender: {p['gender']} | Address: {p['address']} | Disease: {p['disease']} | REFERRED_BY: {p['REFERRED_BY']} | Admission DateTime: {p['admissionDateTime']}")
 
 
-def find_patient_index_by_id(pid):
-    for i, p in enumerate(patients):
-        if p['id'] == pid:
-            return i
-    return -1
-
-
 def edit_patient():
     pid = input("Enter Patient ID to edit: ").strip()
-    idx = find_patient_index_by_id(pid)
-    if idx == -1:
+    p = db.get_patient_by_id(pid)
+    if not p:
         print("Patient not found!")
         return
-    p = patients[idx]
     print("What do you want to edit?")
     print("1. Name\n2. Age\n3. Gender\n4. Address\n5. Disease\n6. Referred By")
     choice = input("Enter your choice: ").strip()
@@ -82,26 +76,26 @@ def edit_patient():
         print("Invalid choice!")
         return
     p['admissionDateTime'] = get_current_datetime()
+    db.update_patient(pid, p)
     print("Patient record updated successfully!")
 
 
 def view_patient_by_id():
     pid = input("Enter Patient ID to view: ").strip()
-    idx = find_patient_index_by_id(pid)
-    if idx == -1:
+    p = db.get_patient_by_id(pid)
+    if not p:
         print("Patient not found!")
         return
-    p = patients[idx]
     print(f"ID: {p['id']} | Name: {p['name']} | Age: {p['age']} | Gender: {p['gender']} | Address: {p['address']} | Disease: {p['disease']} | REFERRED_BY: {p['REFERRED_BY']} | Admission DateTime: {p['admissionDateTime']}")
 
 
 def delete_patient_by_id():
     pid = input("Enter Patient ID to delete: ").strip()
-    idx = find_patient_index_by_id(pid)
-    if idx == -1:
+    p = db.get_patient_by_id(pid)
+    if not p:
         print("Patient not found!")
         return
-    patients.pop(idx)
+    db.delete_patient(pid)
     print("Patient record deleted successfully!")
 
 
@@ -116,16 +110,18 @@ def add_doctor():
     except ValueError:
         print("Invalid experience, setting to 0")
         experience = 0
-    doctors.append({
+    doctor = {
         "id": did,
         "name": name,
         "specialization": specialization,
         "experience": experience,
-    })
+    }
+    db.add_doctor(doctor)
     print("Doctor added successfully!\n")
 
 
 def view_doctors():
+    doctors = db.get_all_doctors()
     if not doctors:
         print("No doctors found.")
         return
@@ -133,20 +129,12 @@ def view_doctors():
         print(f"ID: {d['id']} | Name: {d['name']} | Specialization: {d['specialization']} | Experience: {d['experience']} years")
 
 
-def find_doctor_index_by_id(did):
-    for i, d in enumerate(doctors):
-        if d['id'] == did:
-            return i
-    return -1
-
-
 def edit_doctor():
     did = input("Enter Doctor ID to edit: ").strip()
-    idx = find_doctor_index_by_id(did)
-    if idx == -1:
+    d = db.get_doctor_by_id(did)
+    if not d:
         print("Doctor not found!")
         return
-    d = doctors[idx]
     print("What do you want to edit?\n1. Name\n2. Specialization\n3. Experience")
     choice = input("Enter your choice: ").strip()
     if choice == '1':
@@ -161,26 +149,26 @@ def edit_doctor():
     else:
         print("Invalid choice!")
         return
+    db.update_doctor(did, d)
     print("Doctor record updated successfully!")
 
 
 def view_doctor_by_id():
     did = input("Enter Doctor ID to view: ").strip()
-    idx = find_doctor_index_by_id(did)
-    if idx == -1:
+    d = db.get_doctor_by_id(did)
+    if not d:
         print("Doctor not found!")
         return
-    d = doctors[idx]
     print(f"ID: {d['id']} | Name: {d['name']} | Specialization: {d['specialization']} | Experience: {d['experience']} years")
 
 
 def delete_doctor_by_id():
     did = input("Enter Doctor ID to delete: ").strip()
-    idx = find_doctor_index_by_id(did)
-    if idx == -1:
+    d = db.get_doctor_by_id(did)
+    if not d:
         print("Doctor not found!")
         return
-    doctors.pop(idx)
+    db.delete_doctor(did)
     print("Doctor record deleted successfully!")
 
 
@@ -191,16 +179,18 @@ def add_appointment():
     patient_name = input("Enter Patient Name: ").strip()
     doctor_name = input("Enter Doctor Name: ").strip()
     appointment_time = get_current_datetime()
-    appointments.append({
+    appointment = {
         "id": aid,
         "patientName": patient_name,
         "doctorName": doctor_name,
         "appointmentDateTime": appointment_time,
-    })
+    }
+    db.add_appointment(appointment)
     print("Appointment added successfully!\n")
 
 
 def view_appointments():
+    appointments = db.get_all_appointments()
     if not appointments:
         print("No appointments found.")
         return
@@ -208,20 +198,12 @@ def view_appointments():
         print(f"ID: {a['id']} | Patient Name: {a['patientName']} | Doctor Name: {a['doctorName']} | Appointment DateTime: {a['appointmentDateTime']}")
 
 
-def find_appointment_index_by_id(aid):
-    for i, a in enumerate(appointments):
-        if a['id'] == aid:
-            return i
-    return -1
-
-
 def edit_appointment():
     aid = input("Enter Appointment ID to edit: ").strip()
-    idx = find_appointment_index_by_id(aid)
-    if idx == -1:
+    a = db.get_appointment_by_id(aid)
+    if not a:
         print("Appointment not found!")
         return
-    a = appointments[idx]
     print("What do you want to edit?\n1. Patient Name\n2. Doctor Name")
     choice = input("Enter your choice: ").strip()
     if choice == '1':
@@ -232,33 +214,31 @@ def edit_appointment():
         print("Invalid choice!")
         return
     a['appointmentDateTime'] = get_current_datetime()
+    db.update_appointment(aid, a)
     print("Appointment record updated successfully!")
 
 
 def view_appointment_by_id():
     aid = input("Enter Appointment ID to view: ").strip()
-    idx = find_appointment_index_by_id(aid)
-    if idx == -1:
+    a = db.get_appointment_by_id(aid)
+    if not a:
         print("Appointment not found!")
         return
-    a = appointments[idx]
     print(f"ID: {a['id']} | Patient Name: {a['patientName']} | Doctor Name: {a['doctorName']} | Appointment DateTime: {a['appointmentDateTime']}")
 
 
 def delete_appointment_by_id():
     aid = input("Enter Appointment ID to delete: ").strip()
-    idx = find_appointment_index_by_id(aid)
-    if idx == -1:
+    a = db.get_appointment_by_id(aid)
+    if not a:
         print("Appointment not found!")
         return
-    appointments.pop(idx)
+    db.delete_appointment(aid)
     print("Appointment record deleted successfully!")
 
 
 def reset_all_data():
-    patients.clear()
-    doctors.clear()
-    appointments.clear()
+    db.reset_all_data()
     print("All data reset successfully!")
 
 
