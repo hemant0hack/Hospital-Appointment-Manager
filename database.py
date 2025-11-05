@@ -8,13 +8,20 @@ class HospitalDatabase:
         self.init_database()
     
     def get_connection(self):
-        return sqlite3.connect(self.db_name)
+        try:
+            conn = sqlite3.connect(self.db_name, timeout=30)
+            # Enable foreign key support
+            conn.execute('PRAGMA foreign_keys = ON')
+            return conn
+        except sqlite3.Error as e:
+            raise Exception(f"Database connection error: {str(e)}")
     
     def init_database(self):
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # Create patients table
+        try:
+            # Create patients table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS patients (
                 id TEXT PRIMARY KEY,

@@ -5,11 +5,21 @@ import pandas as pd
 from database import HospitalDatabase
 
 # Initialize database
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def get_database():
-    return HospitalDatabase()
+    try:
+        db = HospitalDatabase()
+        # Test database connection
+        db.get_all_patients()  # This will create tables if they don't exist
+        return db
+    except Exception as e:
+        st.error(f"Database initialization error: {str(e)}")
+        return None
 
 db = get_database()
+if db is None:
+    st.error("Failed to initialize the database. Please check the logs.")
+    st.stop()
 
 def get_current_datetime():
     return datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -37,9 +47,13 @@ def main():
     choice = st.sidebar.selectbox("Select Module", menu_options)
     
     # Load data from database
-    patients = db.get_all_patients()
-    doctors = db.get_all_doctors()
-    appointments = db.get_all_appointments()
+    try:
+        patients = db.get_all_patients()
+        doctors = db.get_all_doctors()
+        appointments = db.get_all_appointments()
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        patients, doctors, appointments = [], [], []  # Use empty lists if database fails
     
     # Dashboard
     if choice == "Dashboard":
