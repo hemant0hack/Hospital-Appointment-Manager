@@ -4,10 +4,60 @@ from datetime import datetime
 import pandas as pd
 from database import HospitalDatabase
 
-# Initialize database
-@st.cache_resource
+# Initialize database and inject custom CSS
+def inject_custom_css():
+    st.markdown("""
+        <style>
+            .stApp {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .stMetric {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                gap: 10px;
+            }
+            .stTabs [data-baseweb="tab"] {
+                padding: 10px 20px;
+                background-color: #f8f9fa;
+            }
+            .form-container {
+                background-color: #ffffff;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .success-alert {
+                padding: 10px;
+                background-color: #d4edda;
+                color: #155724;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .error-alert {
+                padding: 10px;
+                background-color: #f8d7da;
+                color: #721c24;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+@st.cache_resource(show_spinner=False)
 def get_database():
-    return HospitalDatabase()
+    try:
+        db = HospitalDatabase()
+        # Test database connection
+        db.get_connection().close()
+        return db
+    except Exception as e:
+        st.error(f"Database initialization error: {str(e)}")
+        return None
 
 db = get_database()
 
@@ -22,24 +72,40 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    st.title("🏥 Hospital Appointment Manager")
+    if db is None:
+        st.error("Failed to initialize the database. Please check the database connection.")
+        st.stop()
+        
+    inject_custom_css()
+    
+    # Header
+    col1, col2 = st.columns([3,1])
+    with col1:
+        st.title("🏥 Hospital Appointment Manager")
+    with col2:
+        st.caption(f"Last Updated: {get_current_datetime()}")
     st.markdown("---")
     
     # Sidebar for navigation
-    st.sidebar.title("Navigation")
-    menu_options = [
-        "Dashboard",
-        "Patients Management", 
-        "Doctors Management",
-        "Appointments Management",
-        "Reset All Data"
-    ]
-    choice = st.sidebar.selectbox("Select Module", menu_options)
+    with st.sidebar:
+        st.title("Navigation")
+        menu_options = [
+            "Dashboard",
+            "Patients Management", 
+            "Doctors Management",
+            "Appointments Management",
+            "Reset All Data"
+        ]
+        choice = st.selectbox("Select Module", menu_options)
     
-    # Load data from database
-    patients = db.get_all_patients()
-    doctors = db.get_all_doctors()
-    appointments = db.get_all_appointments()
+    # Load data from database with error handling
+    try:
+        patients = db.get_all_patients()
+        doctors = db.get_all_doctors()
+        appointments = db.get_all_appointments()
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        patients, doctors, appointments = [], [], []
     
     # Dashboard
     if choice == "Dashboard":
@@ -62,20 +128,23 @@ def main():
         reset_data()
 
 def show_dashboard(patients, doctors, appointments):
+    # Summary metrics with icons
+    st.subheader("📊 Summary")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Total Patients", len(patients))
+        st.metric("👥 Total Patients", len(patients))
     
     with col2:
-        st.metric("Total Doctors", len(doctors))
+        st.metric("👨‍⚕️ Total Doctors", len(doctors))
     
     with col3:
-        st.metric("Total Appointments", len(appointments))
+        st.metric("📅 Total Appointments", len(appointments))
     
     st.markdown("---")
     
-    # Recent Activity
+    # Recent Activity with better formatting
+    st.subheader("📋 Recent Activity")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -145,12 +214,52 @@ def patients_management():
     
     with tab2:
         st.subheader("All Patients")
-        patients = db.get_all_patients()
-        if patients:
-            patients_df = pd.DataFrame(patients)
-            st.dataframe(patients_df, use_container_width=True)
-        else:
-            st.info("No patients found")
+        try:
+            patients = db.get_all_patients()
+            if patients:
+                patients_df = pd.DataFrame(patients)
+                
+                # Add filters
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    name_filter = st.text_input("🔍 Search by name")
+                with col2:
+                    gender_filter = st.selectbox("Filter by gender", ["All", "Male", "Female", "Other"])
+                with col3:
+                    sort_by = st.selectbox("Sort by", ["Admission Date", "Name", "Age"])
+                
+                # Apply filters
+                filtered_df = patients_df.copy()
+                if name_filter:
+                    filtered_df = filtered_df[filtered_df['name'].str.contains(name_filter, case=False, na=False)]
+                if gender_filter != "All":
+                    filtered_df = filtered_df[filtered_df['gender'] == gender_filter]
+                
+                # Apply sorting
+                if sort_by == "Admission Date":
+                    filtered_df = filtered_df.sort_values('admissionDateTime', ascending=False)
+                elif sort_by == "Name":
+                    filtered_df = filtered_df.sort_values('name')
+                elif sort_by == "Age":
+                    filtered_df = filtered_df.sort_values('age', ascending=False)
+                
+                # Show results count
+                st.caption(f"Showing {len(filtered_df)} of {len(patients_df)} patients")
+                
+                # Display the filtered dataframe
+                st.dataframe(
+                    filtered_df,
+                    use_container_width=True,
+                    column_config={
+                        "name": "Name",
+                        "age": st.column_config.NumberColumn("Age", format="%d years"),
+                        "admissionDateTime": st.column_config.DatetimeColumn("Admission Date"),
+                    }
+                )
+            else:
+                st.info("No patients found")
+        except Exception as e:
+            st.error(f"Error loading patients: {str(e)}")
     
     with tab3:
         st.subheader("Edit Patient")
