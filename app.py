@@ -32,46 +32,7 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Custom CSS
-    st.markdown("""
-        <style>
-        .main {
-            padding: 2rem;
-            border-radius: 10px;
-        }
-        .stButton > button {
-            width: 100%;
-            border-radius: 5px;
-            height: 3em;
-            font-size: 16px;
-        }
-        .stMetric {
-            background-color: #f0f2f6;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .css-1d391kg, .css-12w0qpk {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 1rem;
-        }
-        .st-emotion-cache-1y4p8pa {
-            max-width: 100%;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    # Header with hospital logo and title
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        st.image("https://img.icons8.com/color/96/000000/hospital-2.png", width=80)
-    with col2:
-        st.title("🏥 Hospital Appointment Manager")
-        st.markdown("<p style='font-size: 1.2em; color: #666;'>Streamlined Healthcare Management System</p>", unsafe_allow_html=True)
-    
+    st.title("🏥 Hospital Appointment Manager")
     st.markdown("---")
     
     # Sidebar for navigation
