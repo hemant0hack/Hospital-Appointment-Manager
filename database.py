@@ -207,6 +207,13 @@ class HospitalDatabase:
     
     # Appointment methods
     def add_appointment(self, appointment_data):
+        # Check for overlapping appointments
+        if self.has_overlapping_appointments(
+            appointment_data['doctorName'],
+            appointment_data['appointmentDateTime']
+        ):
+            return False, "This time slot is already booked for the selected doctor"
+            
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
@@ -220,11 +227,45 @@ class HospitalDatabase:
         ))
         conn.commit()
         conn.close()
+        return True, "Appointment scheduled successfully"
+    
+    def has_overlapping_appointments(self, doctor_name, new_appointment_time):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Convert string to datetime for comparison
+        new_time = datetime.strptime(new_appointment_time, "%d-%m-%Y %H:%M:%S")
+        
+        # Get all appointments for the doctor on the same day
+        day_start = new_time.replace(hour=0, minute=0, second=0).strftime("%d-%m-%Y %H:%M:%S")
+        day_end = new_time.replace(hour=23, minute=59, second=59).strftime("%d-%m-%Y %H:%M:%S")
+        
+        cursor.execute('''
+            SELECT appointment_datetime 
+            FROM appointments 
+            WHERE doctor_name = ? 
+            AND appointment_datetime BETWEEN ? AND ?
+        ''', (doctor_name, day_start, day_end))
+        
+        existing_appointments = cursor.fetchall()
+        conn.close()
+        
+        # Check for 30-minute slot conflicts
+        for (existing_time,) in existing_appointments:
+            existing_dt = datetime.strptime(existing_time, "%d-%m-%Y %H:%M:%S")
+            time_difference = abs((new_time - existing_dt).total_seconds() / 60)
+            if time_difference < 30:  # Less than 30 minutes apart
+                return True
+        
+        return False
     
     def get_all_appointments(self):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM appointments')
+        cursor.execute('''
+            SELECT * FROM appointments 
+            ORDER BY appointment_datetime ASC
+        ''')
         appointments = cursor.fetchall()
         conn.close()
         
@@ -250,6 +291,31 @@ class HospitalDatabase:
                 'appointmentDateTime': row[3]
             }
         return None
+        
+    def get_doctor_schedule(self, doctor_name, date):
+        """Get all appointments for a doctor on a specific date"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Convert date to datetime range for the whole day
+        day_start = f"{date} 00:00:00"
+        day_end = f"{date} 23:59:59"
+        
+        cursor.execute('''
+            SELECT appointment_datetime, patient_name 
+            FROM appointments 
+            WHERE doctor_name = ? 
+            AND appointment_datetime BETWEEN ? AND ?
+            ORDER BY appointment_datetime ASC
+        ''', (doctor_name, day_start, day_end))
+        
+        schedule = cursor.fetchall()
+        conn.close()
+        
+        return [{
+            'time': datetime.strptime(row[0], "%d-%m-%Y %H:%M:%S").strftime("%H:%M"),
+            'patient': row[1]
+        } for row in schedule]
     
     def update_appointment(self, appointment_id, updated_data):
         conn = self.get_connection()

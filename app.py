@@ -21,20 +21,55 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+
+    # Custom CSS for better spacing and readability
+    st.markdown("""
+        <style>
+        .main > div {
+            padding: 0;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2em;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+        }
+        div[data-testid="stToolbar"] {
+            display: none;
+        }
+        .main .block-container {
+            padding-top: 0;
+            padding-bottom: 2em;
+        }
+        header {
+            display: none;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Main header centered
+    st.markdown("""
+        <h1 style='text-align: center; padding: 0; margin: 0 0 0.5em 0'>
+            🏥 Hospital Appointment Manager
+        </h1>
+    """, unsafe_allow_html=True)
     
-    st.title("🏥 Hospital Appointment Manager")
-    st.markdown("---")
-    
-    # Sidebar for navigation
-    st.sidebar.title("Navigation")
-    menu_options = [
-        "Dashboard",
-        "Patients Management", 
-        "Doctors Management",
-        "Appointments Management",
-        "Reset All Data"
-    ]
-    choice = st.sidebar.selectbox("Select Module", menu_options)
+    # Navigation menu below header
+    menu_options = {
+        "Dashboard": "📊 Dashboard",
+        "Patients Management": "👥 Patients",
+        "Doctors Management": "👨‍⚕️ Doctors",
+        "Appointments Management": "📅 Appointments",
+        "Reset All Data": "🔄 Reset Data"
+    }
+    choice = st.radio(
+        "",
+        list(menu_options.keys()),
+        format_func=lambda x: menu_options[x],
+        horizontal=True,
+        key="main_navigation"
+    )
+    st.markdown("<hr style='margin: 0.5em 0 2em 0'>", unsafe_allow_html=True)
     
     # Load data from database
     patients = db.get_all_patients()
@@ -62,46 +97,74 @@ def main():
         reset_data()
 
 def show_dashboard(patients, doctors, appointments):
+    st.header("📊 Hospital Overview")
+    
+    # Stats cards with better visual presentation
     col1, col2, col3 = st.columns(3)
-    
     with col1:
-        st.metric("Total Patients", len(patients))
-    
+        st.metric(
+            "Total Patients",
+            len(patients),
+            help="Total number of registered patients in the system"
+        )
     with col2:
-        st.metric("Total Doctors", len(doctors))
-    
+        st.metric(
+            "Total Doctors",
+            len(doctors),
+            help="Total number of registered doctors in the system"
+        )
     with col3:
-        st.metric("Total Appointments", len(appointments))
+        st.metric(
+            "Total Appointments",
+            len(appointments),
+            help="Total number of scheduled appointments"
+        )
     
     st.markdown("---")
     
-    # Recent Activity
+    # Recent Activity section with better organization
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Recent Patients")
+        st.subheader("🆕 Recent Patients")
         if patients:
             recent_patients = patients[-5:] if len(patients) > 5 else patients
             for patient in reversed(recent_patients):
-                st.write(f"**{patient['name']}** (ID: {patient['id']}) - {patient['disease']}")
+                with st.container():
+                    st.markdown(f"""
+                        **Patient:** {patient['name']}  
+                        **ID:** {patient['id']}  
+                        **Condition:** {patient['disease']}
+                        """)
+                    st.markdown("---")
         else:
-            st.info("No patients registered yet")
+            st.info("👋 No patients registered yet. Add your first patient from the Patients Management section.")
     
     with col2:
-        st.subheader("Recent Appointments")
+        st.subheader("📅 Recent Appointments")
         if appointments:
             recent_appointments = appointments[-5:] if len(appointments) > 5 else appointments
             for appointment in reversed(recent_appointments):
-                st.write(f"**{appointment['patientName']}** with **{appointment['doctorName']}**")
+                with st.container():
+                    st.markdown(f"""
+                        **Patient:** {appointment['patientName']}  
+                        **Doctor:** {appointment['doctorName']}  
+                        **Date:** {appointment['appointmentDateTime']}
+                        """)
+                    st.markdown("---")
         else:
-            st.info("No appointments scheduled yet")
+            st.info("📝 No appointments scheduled yet. Schedule one from the Appointments Management section.")
 
 def patients_management():
     st.header("👥 Patients Management")
+    st.caption("Add, view, edit, or remove patient records")
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Add Patient", "View All Patients", "Edit Patient", 
-        "View Patient by ID", "Delete Patient"
+        "➕ Add Patient",
+        "📋 View All",
+        "✏️ Edit Patient",
+        "🔍 Search Patient",
+        "❌ Delete Patient"
     ])
     
     with tab1:
@@ -225,10 +288,14 @@ def patients_management():
 
 def doctors_management():
     st.header("👨‍⚕️ Doctors Management")
+    st.caption("Add, view, edit, or remove doctor records")
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Add Doctor", "View All Doctors", "Edit Doctor", 
-        "View Doctor by ID", "Delete Doctor"
+        "➕ Add Doctor",
+        "📋 View All",
+        "✏️ Edit Doctor",
+        "🔍 Search Doctor",
+        "❌ Delete Doctor"
     ])
     
     with tab1:
@@ -337,10 +404,14 @@ def doctors_management():
 
 def appointments_management(patients, doctors):
     st.header("📅 Appointments Management")
+    st.caption("Schedule, view, modify, or cancel appointments")
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Add Appointment", "View All Appointments", "Edit Appointment", 
-        "View Appointment by ID", "Delete Appointment"
+        "➕ New Appointment",
+        "📋 View All",
+        "✏️ Edit Appointment",
+        "🔍 Search Appointment",
+        "❌ Cancel Appointment"
     ])
     
     with tab1:
@@ -368,8 +439,27 @@ def appointments_management(patients, doctors):
                     st.warning("No doctors available. Please add doctors first.")
                     doctor_name = ""
             
+            # Date and time selection
+            col1, col2 = st.columns(2)
+            with col1:
+                appointment_date = st.date_input(
+                    "Appointment Date*",
+                    help="Select the date for the appointment"
+                )
+            with col2:
+                appointment_time = st.time_input(
+                    "Appointment Time*",
+                    help="Select the time (appointments are in 30-minute slots)"
+                )
+            
             if st.form_submit_button("Add Appointment"):
-                if aid and patient_name and doctor_name:
+                if aid and patient_name and doctor_name and appointment_date and appointment_time:
+                    # Format the appointment datetime
+                    appointment_datetime = datetime.combine(
+                        appointment_date,
+                        appointment_time
+                    ).strftime("%d-%m-%Y %H:%M:%S")
+                    
                     # Check if appointment ID already exists
                     existing_appointment = db.get_appointment_by_id(aid)
                     if existing_appointment:
@@ -379,7 +469,7 @@ def appointments_management(patients, doctors):
                             "id": aid,
                             "patientName": patient_name,
                             "doctorName": doctor_name,
-                            "appointmentDateTime": get_current_datetime(),
+                            "appointmentDateTime": appointment_datetime,
                         }
                         db.add_appointment(appointment_data)
                         st.success("Appointment added successfully!")
@@ -390,9 +480,36 @@ def appointments_management(patients, doctors):
     with tab2:
         st.subheader("All Appointments")
         appointments = db.get_all_appointments()
+        
         if appointments:
-            appointments_df = pd.DataFrame(appointments)
-            st.dataframe(appointments_df, use_container_width=True)
+            # Add filter by date
+            filter_date = st.date_input(
+                "Filter by Date",
+                help="Show appointments for a specific date"
+            )
+            
+            # Filter appointments by selected date
+            filtered_appointments = []
+            for apt in appointments:
+                apt_date = datetime.strptime(apt['appointmentDateTime'], "%d-%m-%Y %H:%M:%S").date()
+                if apt_date == filter_date:
+                    filtered_appointments.append(apt)
+            
+            if filtered_appointments:
+                appointments_df = pd.DataFrame(filtered_appointments)
+                
+                # Format the datetime column for better display
+                appointments_df['Time'] = pd.to_datetime(appointments_df['appointmentDateTime']).dt.strftime('%I:%M %p')
+                appointments_df = appointments_df.rename(columns={
+                    'patientName': 'Patient',
+                    'doctorName': 'Doctor',
+                    'id': 'ID'
+                })
+                appointments_df = appointments_df[['ID', 'Patient', 'Doctor', 'Time']]
+                
+                st.dataframe(appointments_df, use_container_width=True)
+            else:
+                st.info(f"No appointments found for {filter_date.strftime('%d-%m-%Y')}")
         else:
             st.info("No appointments found")
     
@@ -476,15 +593,30 @@ def appointments_management(patients, doctors):
             st.info("No appointments available to delete")
 
 def reset_data():
-    st.header("🔄 Reset All Data")
+    st.header("🔄 Reset Database")
+    st.caption("Clear all data from the system")
     
-    st.warning("⚠️ This action cannot be undone!")
-    st.error("All patient, doctor, and appointment data will be permanently deleted from the database.")
+    st.warning("⚠️ Warning: This action will permanently delete all data!")
     
-    if st.button("Reset All Data", type="primary"):
-        db.reset_all_data()
-        st.success("All data has been reset successfully!")
-        st.rerun()
+    with st.expander("Click to show reset options"):
+        st.error("""
+            This will delete:
+            - All patient records
+            - All doctor records
+            - All appointment schedules
+            
+            This action CANNOT be undone. Please make sure you have backed up any important data.
+        """)
+        
+        confirm_text = st.text_input(
+            "Type 'RESET' to confirm deletion of all data",
+            help="This is a safety measure to prevent accidental data loss"
+        )
+        
+        if confirm_text == "RESET" and st.button("Reset All Data", type="primary"):
+            db.reset_all_data()
+            st.success("✅ All data has been reset successfully!")
+            st.rerun()
 
 if __name__ == "__main__":
     main()
