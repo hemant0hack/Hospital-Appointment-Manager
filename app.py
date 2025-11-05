@@ -24,6 +24,21 @@ if db is None:
 def get_current_datetime():
     return datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
+
+def inject_css():
+    # Small visual improvements for Streamlit app
+    st.markdown(
+        """
+        <style>
+        .stApp { background-color: #f8fafc; }
+        .header { display:flex; align-items:center; gap:12px }
+        .small-muted { color: #6b7280; font-size:12px }
+        .metric-row .stMetric { background: linear-gradient(90deg,#eef2ff,#f0fdf4); padding:14px; border-radius:8px }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 def main():
     st.set_page_config(
         page_title="Hospital Appointment Manager",
@@ -31,8 +46,14 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+    inject_css()
+
+    # Header
     st.title("🏥 Hospital Appointment Manager")
+    colh1, colh2 = st.columns([3, 1])
+    with colh2:
+        st.write(f"\n")
+        st.caption(f"Last updated: {get_current_datetime()}")
     st.markdown("---")
     
     # Sidebar for navigation
@@ -162,7 +183,20 @@ def patients_management():
         patients = db.get_all_patients()
         if patients:
             patients_df = pd.DataFrame(patients)
-            st.dataframe(patients_df, use_container_width=True)
+            # filters
+            cols = st.columns([3, 1])
+            with cols[0]:
+                search_name = st.text_input("Search by name")
+            with cols[1]:
+                min_age = st.number_input("Min age", min_value=0, max_value=150, value=0)
+
+            filtered = patients_df
+            if search_name:
+                filtered = filtered[filtered['name'].str.contains(search_name, case=False, na=False)]
+            if min_age > 0:
+                filtered = filtered[filtered['age'] >= min_age]
+
+            st.dataframe(filtered.reset_index(drop=True), use_container_width=True)
         else:
             st.info("No patients found")
     
@@ -282,7 +316,11 @@ def doctors_management():
         doctors = db.get_all_doctors()
         if doctors:
             doctors_df = pd.DataFrame(doctors)
-            st.dataframe(doctors_df, use_container_width=True)
+            search_doc = st.text_input("Search doctors by name or specialization", key="search_doc")
+            filtered_docs = doctors_df
+            if search_doc:
+                filtered_docs = doctors_df[doctors_df['name'].str.contains(search_doc, case=False, na=False) | doctors_df['specialization'].str.contains(search_doc, case=False, na=False)]
+            st.dataframe(filtered_docs.reset_index(drop=True), use_container_width=True)
         else:
             st.info("No doctors found")
     
@@ -406,7 +444,11 @@ def appointments_management(patients, doctors):
         appointments = db.get_all_appointments()
         if appointments:
             appointments_df = pd.DataFrame(appointments)
-            st.dataframe(appointments_df, use_container_width=True)
+            search_appt = st.text_input("Search by patient or doctor", key="search_appt")
+            filtered_appts = appointments_df
+            if search_appt:
+                filtered_appts = appointments_df[appointments_df['patientName'].str.contains(search_appt, case=False, na=False) | appointments_df['doctorName'].str.contains(search_appt, case=False, na=False)]
+            st.dataframe(filtered_appts.reset_index(drop=True), use_container_width=True)
         else:
             st.info("No appointments found")
     
