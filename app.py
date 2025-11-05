@@ -47,13 +47,9 @@ def main():
     choice = st.sidebar.selectbox("Select Module", menu_options)
     
     # Load data from database
-    try:
-        patients = db.get_all_patients()
-        doctors = db.get_all_doctors()
-        appointments = db.get_all_appointments()
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        patients, doctors, appointments = [], [], []  # Use empty lists if database fails
+    patients = db.get_all_patients()
+    doctors = db.get_all_doctors()
+    appointments = db.get_all_appointments()
     
     # Dashboard
     if choice == "Dashboard":
