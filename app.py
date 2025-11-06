@@ -202,7 +202,6 @@ def patients_management():
                         }
                         db.add_patient(patient_data)
                         st.success("Patient added successfully!")
-                        st.rerun()
                 else:
                     st.error("Please fill in all required fields (*)")
     
@@ -251,7 +250,6 @@ def patients_management():
                         }
                         db.update_patient(selected_pid, updated_data)
                         st.success("Patient updated successfully!")
-                        st.rerun()
         else:
             st.info("No patients available to edit")
     
@@ -282,7 +280,6 @@ def patients_management():
                 if st.button("Confirm Delete"):
                     db.delete_patient(selected_pid)
                     st.success("Patient deleted successfully!")
-                    st.rerun()
         else:
             st.info("No patients available to delete")
 
@@ -326,7 +323,6 @@ def doctors_management():
                         }
                         db.add_doctor(doctor_data)
                         st.success("Doctor added successfully!")
-                        st.rerun()
                 else:
                     st.error("Please fill in all required fields (*)")
     
@@ -367,7 +363,6 @@ def doctors_management():
                         }
                         db.update_doctor(selected_did, updated_data)
                         st.success("Doctor updated successfully!")
-                        st.rerun()
         else:
             st.info("No doctors available to edit")
     
@@ -398,7 +393,6 @@ def doctors_management():
                 if st.button("Confirm Delete"):
                     db.delete_doctor(selected_did)
                     st.success("Doctor deleted successfully!")
-                    st.rerun()
         else:
             st.info("No doctors available to delete")
 
@@ -473,7 +467,6 @@ def appointments_management(patients, doctors):
                         }
                         db.add_appointment(appointment_data)
                         st.success("Appointment added successfully!")
-                        st.rerun()
                 else:
                     st.error("Please fill in all required fields (*)")
     
@@ -557,7 +550,6 @@ def appointments_management(patients, doctors):
                         }
                         db.update_appointment(selected_aid, updated_data)
                         st.success("Appointment updated successfully!")
-                        st.rerun()
         else:
             st.info("No appointments available to edit")
     
@@ -588,7 +580,6 @@ def appointments_management(patients, doctors):
                 if st.button("Confirm Delete"):
                     db.delete_appointment(selected_aid)
                     st.success("Appointment deleted successfully!")
-                    st.rerun()
         else:
             st.info("No appointments available to delete")
 
@@ -616,7 +607,6 @@ def reset_data():
         if confirm_text == "RESET" and st.button("Reset All Data", type="primary"):
             db.reset_all_data()
             st.success("✅ All data has been reset successfully!")
-            st.rerun()
 
 if __name__ == "__main__":
     main()
