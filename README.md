@@ -1,6 +1,9 @@
 # Hospital Appointment Manager
 
 A simple hospital appointment manager built with Python and Streamlit. Use this app to register patients and doctors, schedule appointments, view and edit records, and reset the database. A demo data seeder is included to quickly populate the app for testing.
+## Demo
+
+![Hospital Appointment Manager](/Hospital%20Appointment%20System/1.png)
 
 ## Features
 - Add / view / edit / delete patients
